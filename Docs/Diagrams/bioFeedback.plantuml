@@ -1,0 +1,40 @@
+@startuml BioFeedback
+
+interface ISensor<T>
+{
+    GetLatestValue(): T
+    OnValueReceived(): Action<T>
+}
+
+class HeartSensor
+{
+    GetLatestValue(): int
+    OnValueReceived(): Action<int>
+    Initialize(): void
+}
+
+
+interface ISensorConnector
+{
+    Connect(): void
+}
+
+class TcpSensorConnector
+{
+
+}
+
+class WebSocketSensorConnector
+{
+
+}
+
+
+TcpSensorConnector ..|> ISensorConnector
+WebSocketSensorConnector ..|> ISensorConnector
+
+HeartSensor ..|> ISensor
+ISensor --o ISensorConnector
+
+
+@enduml

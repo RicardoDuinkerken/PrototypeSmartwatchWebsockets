@@ -1,0 +1,107 @@
+@startuml WavyMusic
+
+enum Note
+{
+    Green
+    Yellow
+    Blue
+    Purple
+    Red
+}
+
+interface IAvatar
+{
+    Instruct(note: Note): void
+    SetCallbackTrackPlayed(callback: Function): void
+}
+
+interface IScoreCalculator
+{
+    GetScore(): float
+}
+
+class NotePlayer
+{
+    PlayNote(note: Note): void
+}
+
+class NotePillar
+{
+    -note: Note
+    + noteHit: event
+}
+
+class FeedbackController
+{
+
+}
+
+class TrackPlayer
+{
+    Start(track: Track): void
+    SetCallbackTrackPlayed(callback: Function): void
+}
+
+interface IMusicTherapy
+{
+    Start()
+    UpdateSpeed(speed: float): void
+}
+
+class TrackGenerator
+{
+    GenerateTrack(): Track
+}
+
+class Timer
+{
+    Start(): void
+    SetCallbackTimerReached(callback: Function): void
+    SetClockSpeed(clockSpeed: float): void
+}
+
+class Track
+{
+    note: Note[]
+    delays: int[]
+}
+
+
+class FollowMeMusicTherapy
+{
+
+}
+
+class FollowMeMechanism
+{
+    SetTrack(track: Track): void 
+    OnResultFollowMeMechanism(function: Function(bool)): void
+}
+
+class TogetherMusicTherapy
+{
+
+}
+
+FeedbackController o-> "2" IMusicTherapy
+FeedbackController o---> "2" IScoreCalculator
+
+
+IMusicTherapy o--> "1" TrackPlayer
+IMusicTherapy o--> "1" Timer
+IMusicTherapy o--> "1" TrackGenerator
+
+TrackPlayer o-> "1" IAvatar
+TrackPlayer o--> "1" Timer
+
+NotePillar o--> "1" NotePlayer
+IScoreCalculator o--> "5" NotePillar
+
+FollowMeMusicTherapy ..|> IMusicTherapy
+FollowMeMusicTherapy o--> FollowMeMechanism
+
+FollowMeMechanism o--> NotePillar
+
+TogetherMusicTherapy ..|> IMusicTherapy
+
+@enduml

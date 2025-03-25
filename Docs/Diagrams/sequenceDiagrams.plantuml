@@ -1,0 +1,44 @@
+@startuml TogetherMusicTherapySequenceSuccess
+actor user
+user -> TogetherMusicTherapy: Start
+TogetherMusicMusicTherapy -> TrackPlayer: Start(track)
+
+loop until notes left
+TrackPlayer -> Timer: SetTimer()
+TrackPlayer <-- Timer: TimerDone
+TrackPlayer -> IAvatar: Instruct(note)
+TrackPlayer <-- IAvatar: FinishedAnimation
+end loop
+TogetherMusicMusicTherapy <-- TrackPlayer: Finished Track
+
+
+TogetherMusicMusicTherapy -> TogetherMusicMechanism: SetTrack(track)
+
+loop nextCorrectNoteHIt
+TogetherMusicMechanism <-- NotePillar: NoteHit
+end loop
+
+TogetherMusicMusicTherapy <-- TogetherMusicMechanism: Correct
+@enduml
+@startuml FollowMeMusicTherapySequence
+actor user
+user -> FollowMeMusicTherapy: Start
+FollowMeMusicTherapy -> TrackPlayer: Start(track)
+
+loop until notes left
+TrackPlayer -> Timer: SetTimer()
+TrackPlayer <-- Timer: TimerDone
+TrackPlayer -> IAvatar: Instruct(note)
+TrackPlayer <-- IAvatar: FinishedAnimation
+end loop
+FollowMeMusicTherapy <-- TrackPlayer: Finished Track
+
+
+FollowMeMusicTherapy -> FollowMeMechanism: SetTrack(track)
+
+loop nextCorrectNoteHIt
+FollowMeMechanism <-- NotePillar: NoteHit
+end loop
+
+FollowMeMusicTherapy <-- FollowMeMechanism: Correct
+@enduml

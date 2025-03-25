@@ -1,0 +1,26 @@
+@startuml ProjectOverview
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+System(Capybara, "The Last Capybara", "Follow the Capybara to together do music therapy")
+System(WorldTree, "World Tree", "Listen to calming music")
+System(Puzzle, "Puzzle", "A Puzzle game related to relaxation and music thearpy")
+System(MusicTherapyEssentials, "Music Therapy Essentials", "A set of scripts necessary for multiple of the ")
+
+Rel(Capybara, MusicTherapyEssentials, "Uses")
+Rel(WorldTree, MusicTherapyEssentials, "Uses")
+Rel(Puzzle, MusicTherapyEssentials, "Uses")
+
+@enduml
+@startuml MusicTherapyEssentials
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+
+System_Boundary(MusicTherapyEssentials, "Music Therapy Essentials") {
+    Container(ScoreSystem, "Score System", "C#", "Basis for the system to ")
+    Container(ScoreVisualizer, "Score Visualizer", "C#", "Basis to standerdize visualization system.")
+    Container(BioFeedback, "Biofeedback system", "C#", "Mechanism to provide biofeedback of the user to the music therapy.")
+}
+
+Rel(BioFeedback, ScoreSystem, "Provide data")
+Rel(ScoreSystem, ScoreVisualizer, "Provide data")
+@enduml
