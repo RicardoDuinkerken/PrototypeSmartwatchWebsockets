@@ -2,16 +2,12 @@ using UnityEngine;
 using System;
 using System.Net.Sockets;
 using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 // Code for handling the connection handshake between the server and client
 public class SocketProtocol
 {
-    [Serializable]
-    private class BaseMessage
-    {
-        public string type;
-    }
-
     [Serializable]
     public class HandshakeData
     {
@@ -43,18 +39,19 @@ public class SocketProtocol
     {
         try
         {
-            BaseMessage baseMsg = JsonUtility.FromJson<BaseMessage>(json);
-            if (string.IsNullOrEmpty(baseMsg.type)) return MessageType.Unknown;
+            JObject obj = JObject.Parse(json);
+            string type = (string)obj["type"];
 
-            return baseMsg.type.ToLower() switch
+            return type?.ToLower() switch
             {
                 "heartrate" => MessageType.HeartRate,
                 "handshake" => MessageType.Handshake,
-                _ => MessageType.Unknown,
+                _ => MessageType.Unknown
             };
         }
-        catch
+        catch (Exception e)
         {
+            Debug.LogWarning($"[SocketProtocol] Failed to parse message type: {e.Message}");
             return MessageType.Unknown;
         }
     }
@@ -66,27 +63,56 @@ public class SocketProtocol
         switch (type)
         {
             case MessageType.HeartRate:
-                HeartRateData heartRate = JsonUtility.FromJson<HeartRateData>(json);
-                MainThreadDispatcher.Instance.Enqueue(() =>
+                try
                 {
-                    HeartRateEvents.onHeartRateReceived?.Invoke(heartRate);
-                });
+                    HeartRateData heartRate = JsonConvert.DeserializeObject<HeartRateData>(json);
+
+                    var dispatcher = MainThreadDispatcher.Instance;
+                    if (dispatcher != null)
+                    {
+                        dispatcher.Enqueue(() =>
+                        {
+                            HeartRateEvents.onHeartRateReceived?.Invoke(heartRate);
+                        });
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[SocketProtocol] Skipped dispatching HR event — dispatcher is null (probably exiting).");
+                    }
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[SocketProtocol] Failed to parse HeartRateData: {e.Message}");
+                }
                 break;
 
             case MessageType.Handshake:
-                HandshakeData hs = JsonUtility.FromJson<HandshakeData>(json);
-                Debug.Log($"[SocketProtocol] Handshake from device: {hs.deviceId}");
-
-                if (connection != null)
+                try
                 {
-                    connection.SetDeviceId(hs.deviceId);
+                    HandshakeData hs = JsonConvert.DeserializeObject<HandshakeData>(json);
+
+                    // Defer Unity-safe stuff to main thread
+                    MainThreadDispatcher.Instance.Enqueue(() =>
+                    {
+                        Debug.Log($"[SocketProtocol] Handshake from device: {hs.deviceId}");
+
+                        if (connection != null)
+                        {
+                            connection.SetDeviceId(hs.deviceId);
+                        }
+
+                        if (stream != null)
+                        {
+                            var responseObj = new { type = "handshake_success" };
+                            string responseJson = JsonConvert.SerializeObject(responseObj) + "\n";
+                            byte[] responseBytes = Encoding.UTF8.GetBytes(responseJson);
+                            stream.Write(responseBytes, 0, responseBytes.Length);
+                        }
+                    });
                 }
-
-                if (stream != null)
+                catch (Exception e)
                 {
-                    string response = "handshake_success";
-                    byte[] responseBytes = Encoding.UTF8.GetBytes(response + "\n");
-                    stream.Write(responseBytes, 0, responseBytes.Length);
+                    Debug.LogWarning($"[SocketProtocol] Failed to parse HandshakeData: {e.Message}");
                 }
                 break;
 

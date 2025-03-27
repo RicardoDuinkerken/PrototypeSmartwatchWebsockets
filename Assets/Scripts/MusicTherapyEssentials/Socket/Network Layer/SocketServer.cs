@@ -13,7 +13,9 @@ public class SocketServer : MonoBehaviour
 
     private TcpListener listener;
     private Thread serverThread;
+
     private bool isRunning;
+    public static bool IsRunning { get; private set; }
 
     void Start()
     {
@@ -29,8 +31,12 @@ public class SocketServer : MonoBehaviour
     public void StartServer()
     {
         isRunning = true;
-        serverThread = new Thread(ListenForConnections);
-        serverThread.IsBackground = true;
+        IsRunning = true;
+
+        serverThread = new Thread(ListenForConnections)
+        {
+            IsBackground = true
+        };
         serverThread.Start();
     }
 
@@ -50,7 +56,6 @@ public class SocketServer : MonoBehaviour
             }
             catch (Exception e)
             {
-                // Happens during shutdown, safe to ignore
                 if (isRunning)
                 {
                     Debug.LogError($"[SocketServer] Socket error: {e.Message}");
@@ -62,6 +67,8 @@ public class SocketServer : MonoBehaviour
     public void StopServer()
     {
         isRunning = false;
+        IsRunning = false;
+
         listener?.Stop();
         serverThread?.Abort();
     }

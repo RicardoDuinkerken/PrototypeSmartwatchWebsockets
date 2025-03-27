@@ -4,30 +4,125 @@ using System.Net.Sockets;
 
 public static class SessionManager
 {
-    private static Dictionary<string, SocketConnection> activeSessions = new Dictionary<string, SocketConnection>();
+    private static Dictionary<string, SocketConnection> pendingDevices = new();
+    private static string activeDeviceId = null;
+
+    public static event System.Action DevicesUpdated;
+
+    public static IReadOnlyDictionary<string, SocketConnection> GetPendingDevices() => pendingDevices;
+    public static string GetActiveDeviceId() => activeDeviceId;
 
     public static void Register(string deviceId, SocketConnection connection)
     {
-        if (activeSessions.ContainsKey(deviceId))
+        if (activeDeviceId == null)
         {
-            Debug.LogWarning($"[SessionManager] Replacing existing connection for {deviceId}");
-            activeSessions[deviceId].Close(); // Close the old connection
-        }
+            if (pendingDevices.TryGetValue(deviceId, out var existing))
+            {
+                Debug.LogWarning($"[SessionManager] Replacing pending connection for {deviceId}");
+                existing.Close(); // 🔁 Close old connection
+                pendingDevices[deviceId] = connection;
+            }
+            else
+            {
+                pendingDevices.Add(deviceId, connection);
+                Debug.Log($"[SessionManager] Pending device registered: {deviceId}");
+            }
 
-        activeSessions[deviceId] = connection;
-        Debug.Log($"[SessionManager] Registered: {deviceId}");
+            MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+        }
+        else if (deviceId == activeDeviceId)
+        {
+            // Already the active device — do nothing
+            return;
+        }
+        else
+        {
+            Debug.LogWarning($"[SessionManager] Rejecting device {deviceId} — {activeDeviceId} is active");
+            connection.Close();
+        }
     }
 
     public static void Unregister(string deviceId)
     {
-        if (activeSessions.Remove(deviceId))
+        if (pendingDevices.Remove(deviceId))
         {
-            Debug.Log($"[SessionManager] Unregistered: {deviceId}");
+            Debug.Log($"[SessionManager] Removed pending device: {deviceId}");
+        }
+
+        if (deviceId == activeDeviceId)
+        {
+            Debug.Log($"[SessionManager] Active device disconnected: {deviceId}");
+            activeDeviceId = null;
+        }
+
+        MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+    }
+
+    public static void SetActive(string deviceId)
+    {
+        if (!pendingDevices.ContainsKey(deviceId))
+        {
+            Debug.LogWarning($"[SessionManager] Cannot activate {deviceId} — not pending.");
+            return;
+        }
+
+        activeDeviceId = deviceId;
+        Debug.Log($"[SessionManager] Device activated: {deviceId}");
+
+        RejectAllExcept(deviceId);
+        MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+    }
+
+    public static void DeactivateCurrentDevice()
+    {
+        if (activeDeviceId != null)
+        {
+            Debug.Log($"[SessionManager] Deactivating device: {activeDeviceId}");
+            activeDeviceId = null;
+            MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
         }
     }
 
-    public static bool IsConnected(string deviceId)
+    private static void RejectAllExcept(string keepDeviceId)
     {
-        return activeSessions.ContainsKey(deviceId);
+        List<string> toRemove = new();
+
+        foreach (var kvp in pendingDevices)
+        {
+            string deviceId = kvp.Key;
+            var conn = kvp.Value;
+
+            if (deviceId != keepDeviceId)
+            {
+                Debug.Log($"[SessionManager] Rejecting device: {deviceId}");
+                conn.Close();
+                toRemove.Add(deviceId);
+            }
+        }
+
+        foreach (var id in toRemove)
+        {
+            pendingDevices.Remove(id);
+        }
     }
+
+    public static bool IsDeviceActive(string deviceId)
+    {
+        return deviceId == activeDeviceId;
+    }
+
+    public static bool HasActiveDevice()
+    {
+        return activeDeviceId != null;
+    }
+
+    public static void SendToActive(string message)
+    {
+        if (activeDeviceId != null && pendingDevices.TryGetValue(activeDeviceId, out var connection))
+        {
+            connection.SendRaw(message);
+            Debug.Log($"[SessionManager] Sent to {activeDeviceId}: {message}");
+        }
+    }
+
 }

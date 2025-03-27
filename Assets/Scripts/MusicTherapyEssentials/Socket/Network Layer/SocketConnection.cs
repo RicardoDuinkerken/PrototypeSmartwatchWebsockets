@@ -19,8 +19,10 @@ public class SocketConnection
         client = tcpClient;
         stream = client.GetStream();
 
-        var thread = new System.Threading.Thread(HandleClient);
-        thread.IsBackground = true;
+        var thread = new System.Threading.Thread(HandleClient)
+        {
+            IsBackground = true
+        };
         thread.Start();
     }
 
@@ -45,17 +47,36 @@ public class SocketConnection
         }
     }
 
+    public void SendRaw(string message)
+    {
+        try
+        {
+            if (client.Connected)
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(message.Trim() + "\n");
+                stream.Write(bytes, 0, bytes.Length);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[SocketConnection] Failed to send: {e.Message}");
+        }
+    }
+
     private void HandleClient()
     {
         try
         {
             int byteCount;
-            while ((byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
+            while (SocketServer.IsRunning && (byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
             {
-                string json = Encoding.UTF8.GetString(buffer, 0, byteCount).Trim();
-                Debug.Log($"[SocketConnection] Received: {json}");
+                string incoming = Encoding.UTF8.GetString(buffer, 0, byteCount);
+                string[] messages = incoming.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-                SocketProtocol.HandleMessage(json, stream, this);
+                foreach (string message in messages)
+                {
+                    SocketProtocol.HandleMessage(message.Trim(), stream, this);
+                }
             }
         }
         catch (Exception e)

@@ -5,19 +5,20 @@ using UnityEngine;
 public class MainThreadDispatcher : MonoBehaviour
 {
     private static MainThreadDispatcher _instance;
+
     public static MainThreadDispatcher Instance
     {
         get
         {
             if (_instance == null)
             {
-                Debug.LogError("MainThreadDispatcher not initialized. Make sure it's present in the scene before starting server.");
+                Debug.LogWarning("[MainThreadDispatcher] Instance is null");
             }
             return _instance;
         }
     }
 
-    private readonly Queue<Action> executionQueue = new Queue<Action>();
+    private readonly Queue<Action> executionQueue = new();
 
     public static void InitializeOnMainThread(MainThreadDispatcher dispatcher)
     {
