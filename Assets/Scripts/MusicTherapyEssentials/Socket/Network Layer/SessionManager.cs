@@ -6,20 +6,33 @@ public static class SessionManager
 {
     private static Dictionary<string, SocketConnection> pendingDevices = new();
     private static string activeDeviceId = null;
+    private static string lastActiveDeviceId = null;
+    private static HashSet<string> previouslyStartedDevices = new();
 
     public static event System.Action DevicesUpdated;
 
     public static IReadOnlyDictionary<string, SocketConnection> GetPendingDevices() => pendingDevices;
     public static string GetActiveDeviceId() => activeDeviceId;
+    public static string GetLastActiveDeviceId() => lastActiveDeviceId;
 
     public static void Register(string deviceId, SocketConnection connection)
     {
         if (activeDeviceId == null)
         {
-            if (pendingDevices.TryGetValue(deviceId, out var existing))
+            if (pendingDevices.ContainsKey(deviceId))
             {
-                Debug.LogWarning($"[SessionManager] Replacing pending connection for {deviceId}");
-                existing.Close(); // 🔁 Close old connection
+                var existing = pendingDevices[deviceId];
+
+                if (existing != null)
+                {
+                    Debug.LogWarning($"[SessionManager] Replacing active pending connection for {deviceId}");
+                    existing.Close();
+                }
+                else
+                {
+                    Debug.Log($"[SessionManager] Replacing disconnected reference for {deviceId}");
+                }
+
                 pendingDevices[deviceId] = connection;
             }
             else
@@ -29,6 +42,15 @@ public static class SessionManager
             }
 
             MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+
+            // ✅ Auto-reconnect and resume
+            if (deviceId == lastActiveDeviceId && previouslyStartedDevices.Contains(deviceId))
+            {
+                Debug.Log($"[SessionManager] Re-activating and restarting device: {deviceId} after reconnect");
+
+                SetActive(deviceId);
+                StartActiveDevice();
+            }
         }
         else if (deviceId == activeDeviceId)
         {
@@ -44,9 +66,10 @@ public static class SessionManager
 
     public static void Unregister(string deviceId)
     {
-        if (pendingDevices.Remove(deviceId))
+        if (pendingDevices.TryGetValue(deviceId, out var connection))
         {
-            Debug.Log($"[SessionManager] Removed pending device: {deviceId}");
+            pendingDevices[deviceId] = null; // Mark as disconnected
+            Debug.Log($"[SessionManager] Device marked as disconnected: {deviceId}");
         }
 
         if (deviceId == activeDeviceId)
@@ -67,10 +90,37 @@ public static class SessionManager
         }
 
         activeDeviceId = deviceId;
+        lastActiveDeviceId = deviceId;
+
         Debug.Log($"[SessionManager] Device activated: {deviceId}");
 
         RejectAllExcept(deviceId);
         MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+    }
+
+    public static void StartActiveDevice()
+    {
+        if (activeDeviceId != null)
+        {
+            SendToActive("{\"type\": \"start\"}");
+            previouslyStartedDevices.Add(activeDeviceId);
+            Debug.Log($"[SessionManager] Sent start to active device: {activeDeviceId}");
+        }
+    }
+
+    public static void StopActiveDevice()
+    {
+        if (activeDeviceId != null)
+        {
+            SendToActive("{\"type\": \"stop\"}");
+            previouslyStartedDevices.Remove(activeDeviceId);
+            Debug.Log($"[SessionManager] Sent stop to active device: {activeDeviceId}");
+        }
+    }
+
+    public static bool IsDeviceConnected(string deviceId)
+    {
+        return pendingDevices.TryGetValue(deviceId, out var connection) && connection != null;
     }
 
     public static void DeactivateCurrentDevice()

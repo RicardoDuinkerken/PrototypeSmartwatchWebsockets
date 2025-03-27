@@ -61,25 +61,33 @@ public class BioFeedbackManager : MonoBehaviour
         foreach (var kvp in SessionManager.GetPendingDevices())
         {
             string deviceId = kvp.Key;
+            bool isActive = SessionManager.IsDeviceActive(deviceId);
+            bool isConnected = SessionManager.IsDeviceConnected(deviceId);
 
             GameObject buttonObj = Instantiate(deviceButtonPrefab, deviceListContainer);
             TMP_Text label = buttonObj.GetComponentInChildren<TMP_Text>();
             Button btn = buttonObj.GetComponentInChildren<Button>();
 
-            bool isActive = SessionManager.IsDeviceActive(deviceId);
-            label.text = isActive ? $"<b>{deviceId}</b> (active)" : deviceId;
+            // Label formatting
+            if (!isConnected)
+                label.text = $"<color=red>{deviceId} (connection lost)</color>";
+            else if (isActive)
+                label.text = $"<b>{deviceId}</b> (active)";
+            else
+                label.text = deviceId;
 
+            btn.onClick.RemoveAllListeners(); // safety
             btn.onClick.AddListener(() =>
             {
                 if (isActive)
                 {
-                    SessionManager.SendToActive("{\"type\":\"stop\"}");
+                    SessionManager.StopActiveDevice();
                     SessionManager.DeactivateCurrentDevice();
                 }
                 else
                 {
                     SessionManager.SetActive(deviceId);
-                    SessionManager.SendToActive("{\"type\":\"start\"}");
+                    SessionManager.StartActiveDevice();
                 }
 
                 UpdateConnectedText();
@@ -92,10 +100,18 @@ public class BioFeedbackManager : MonoBehaviour
 
     private void UpdateConnectedText()
     {
-        string current = SessionManager.HasActiveDevice()
-            ? SessionManager.GetActiveDeviceId()
-            : "None";
-
-        connectedText.text = $"Connected: {current}";
+        if (SessionManager.HasActiveDevice())
+        {
+            connectedText.text = $"Connected: {SessionManager.GetActiveDeviceId()}";
+        }
+        else if (!string.IsNullOrEmpty(SessionManager.GetLastActiveDeviceId()) &&
+                 !SessionManager.IsDeviceConnected(SessionManager.GetLastActiveDeviceId()))
+        {
+            connectedText.text = $"Connection Lost: {SessionManager.GetLastActiveDeviceId()}";
+        }
+        else
+        {
+            connectedText.text = "Connected: None";
+        }
     }
 }
