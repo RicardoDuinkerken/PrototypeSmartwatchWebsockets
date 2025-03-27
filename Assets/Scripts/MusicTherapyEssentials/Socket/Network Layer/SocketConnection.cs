@@ -26,10 +26,10 @@ public class SocketConnection
         thread.Start();
     }
 
-    public void SetDeviceId(string id)
+    public bool SetDeviceId(string id)
     {
         deviceId = id;
-        SessionManager.Register(id, this);
+        return SessionManager.Register(id, this);
     }
 
     public void Close()

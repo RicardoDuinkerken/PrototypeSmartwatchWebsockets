@@ -76,6 +76,8 @@ public class BioFeedbackManager : MonoBehaviour
             else
                 label.text = deviceId;
 
+            btn.interactable = isConnected;
+
             btn.onClick.RemoveAllListeners(); // safety
             btn.onClick.AddListener(() =>
             {

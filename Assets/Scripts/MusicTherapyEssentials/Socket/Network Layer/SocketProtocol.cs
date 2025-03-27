@@ -56,7 +56,7 @@ public class SocketProtocol
         }
     }
 
-    public static void HandleMessage(string json, NetworkStream stream = null, SocketConnection connection = null)
+ public static void HandleMessage(string json, NetworkStream stream = null, SocketConnection connection = null)
     {
         MessageType type = GetMessageType(json);
 
@@ -66,6 +66,13 @@ public class SocketProtocol
                 try
                 {
                     HeartRateData heartRate = JsonConvert.DeserializeObject<HeartRateData>(json);
+
+                    // 🧠 Only allow data from the active device
+                    if (!SessionManager.IsDeviceActive(heartRate.deviceId))
+                    {
+                        Debug.Log($"[SocketProtocol] Ignoring HR from {heartRate.deviceId} (not active)");
+                        return;
+                    }
 
                     var dispatcher = MainThreadDispatcher.Instance;
                     if (dispatcher != null)
@@ -91,22 +98,29 @@ public class SocketProtocol
                 {
                     HandshakeData hs = JsonConvert.DeserializeObject<HandshakeData>(json);
 
-                    // Defer Unity-safe stuff to main thread
                     MainThreadDispatcher.Instance.Enqueue(() =>
                     {
                         Debug.Log($"[SocketProtocol] Handshake from device: {hs.deviceId}");
 
+                        bool accepted = false;
                         if (connection != null)
                         {
-                            connection.SetDeviceId(hs.deviceId);
+                            accepted = connection.SetDeviceId(hs.deviceId);
                         }
 
-                        if (stream != null)
+                        if (accepted && stream != null)
                         {
-                            var responseObj = new { type = "handshake_success" };
-                            string responseJson = JsonConvert.SerializeObject(responseObj) + "\n";
-                            byte[] responseBytes = Encoding.UTF8.GetBytes(responseJson);
-                            stream.Write(responseBytes, 0, responseBytes.Length);
+                            try
+                            {
+                                var responseObj = new { type = "handshake_success" };
+                                string responseJson = JsonConvert.SerializeObject(responseObj) + "\n";
+                                byte[] responseBytes = Encoding.UTF8.GetBytes(responseJson);
+                                stream.Write(responseBytes, 0, responseBytes.Length);
+                            }
+                            catch (Exception e)
+                            {
+                                Debug.LogWarning($"[SocketProtocol] Stream already closed while responding to handshake: {e.Message}");
+                            }
                         }
                     });
                 }

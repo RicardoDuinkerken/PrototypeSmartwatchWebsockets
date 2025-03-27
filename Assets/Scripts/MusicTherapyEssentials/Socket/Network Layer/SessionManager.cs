@@ -15,7 +15,7 @@ public static class SessionManager
     public static string GetActiveDeviceId() => activeDeviceId;
     public static string GetLastActiveDeviceId() => lastActiveDeviceId;
 
-    public static void Register(string deviceId, SocketConnection connection)
+    public static bool Register(string deviceId, SocketConnection connection)
     {
         if (activeDeviceId == null)
         {
@@ -43,7 +43,7 @@ public static class SessionManager
 
             MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
 
-            // ✅ Auto-reconnect and resume
+            //Auto-reconnect and resume
             if (deviceId == lastActiveDeviceId && previouslyStartedDevices.Contains(deviceId))
             {
                 Debug.Log($"[SessionManager] Re-activating and restarting device: {deviceId} after reconnect");
@@ -51,16 +51,22 @@ public static class SessionManager
                 SetActive(deviceId);
                 StartActiveDevice();
             }
+
+            return true;
         }
         else if (deviceId == activeDeviceId)
         {
             // Already the active device — do nothing
-            return;
+            return true;
         }
         else
         {
             Debug.LogWarning($"[SessionManager] Rejecting device {deviceId} — {activeDeviceId} is active");
             connection.Close();
+            pendingDevices.Remove(deviceId);
+            MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+            
+            return false;
         }
     }
 
@@ -89,13 +95,30 @@ public static class SessionManager
             return;
         }
 
+        if (!pendingDevices.ContainsKey(deviceId) || pendingDevices[deviceId] == null)
+        {
+            Debug.LogWarning($"[SessionManager] Cannot activate {deviceId} — device is disconnected.");
+            return;
+        }
+
+        // Stop previous device if one was active
+        if (activeDeviceId != null && activeDeviceId != deviceId)
+        {
+            StopActiveDevice();
+            previouslyStartedDevices.Remove(activeDeviceId);
+        }
+
+        // Set new active
         activeDeviceId = deviceId;
         lastActiveDeviceId = deviceId;
 
         Debug.Log($"[SessionManager] Device activated: {deviceId}");
 
-        RejectAllExcept(deviceId);
         MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
+
+        // Start new one
+        StartActiveDevice();
+        previouslyStartedDevices.Add(deviceId);
     }
 
     public static void StartActiveDevice()
