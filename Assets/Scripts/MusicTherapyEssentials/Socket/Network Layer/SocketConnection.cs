@@ -11,13 +11,14 @@ public class SocketConnection
     private TcpClient client;
     private NetworkStream stream;
     private byte[] buffer = new byte[1024];
-
     private string deviceId;
+    private SocketServer server;
 
-    public SocketConnection(TcpClient tcpClient)
+    public SocketConnection(TcpClient tcpClient, SocketServer server)
     {
-        client = tcpClient;
-        stream = client.GetStream();
+        this.client = tcpClient;
+        this.server = server;
+        this.stream = client.GetStream();
 
         var thread = new System.Threading.Thread(HandleClient)
         {
@@ -38,8 +39,12 @@ public class SocketConnection
         {
             stream?.Close();
             client?.Close();
+            Debug.Log("[SocketConnection] Closed socket.");
         }
-        catch { }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[SocketConnection] Error closing socket: {e.Message}");
+        }
 
         if (!string.IsNullOrEmpty(deviceId))
         {

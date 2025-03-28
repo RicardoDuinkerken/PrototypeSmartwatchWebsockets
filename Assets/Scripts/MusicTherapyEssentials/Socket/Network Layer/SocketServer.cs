@@ -9,13 +9,15 @@ using UnityEngine.Events;
 // Require component type of MainThreadDispatcher
 public class SocketServer : MonoBehaviour
 {
+    public static bool IsRunning { get; private set; }
     public int port = 7474;
 
     private TcpListener listener;
     private Thread serverThread;
 
     private bool isRunning;
-    public static bool IsRunning { get; private set; }
+
+    private readonly List<SocketConnection> activeConnections = new List<SocketConnection>();
 
     void Start()
     {
@@ -52,7 +54,9 @@ public class SocketServer : MonoBehaviour
             {
                 TcpClient client = listener.AcceptTcpClient();
                 Debug.Log("[SocketServer] New client connected");
-                new SocketConnection(client); // spawn handler
+
+                var connection = new SocketConnection(client, this);
+                RegisterConnection(connection);
             }
             catch (Exception e)
             {
@@ -64,12 +68,30 @@ public class SocketServer : MonoBehaviour
         }
     }
 
+    public void RegisterConnection(SocketConnection connection)
+    {
+        lock (activeConnections)
+        {
+            activeConnections.Add(connection);
+        }
+    }
+
     public void StopServer()
     {
         isRunning = false;
         IsRunning = false;
 
+        lock (activeConnections)
+        {
+            foreach (var connection in activeConnections)
+            {
+                connection.Close();
+            }
+            activeConnections.Clear();
+        }
+
         listener?.Stop();
         serverThread?.Abort();
+        Debug.Log("[SocketServer] Server stopped and all connections closed.");
     }
 }
