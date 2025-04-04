@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
@@ -40,6 +41,7 @@ public class SocketServer : MonoBehaviour
             IsBackground = true
         };
         serverThread.Start();
+        StartDiscoveryBroadcast();
     }
 
     private void ListenForConnections()
@@ -93,5 +95,36 @@ public class SocketServer : MonoBehaviour
         listener?.Stop();
         serverThread?.Abort();
         Debug.Log("[SocketServer] Server stopped and all connections closed.");
+    }
+
+    private void StartDiscoveryBroadcast()
+    {
+        new Thread(() =>
+        {
+            using UdpClient udp = new UdpClient();
+            udp.EnableBroadcast = true;
+            IPEndPoint endPoint = new IPEndPoint(IPAddress.Broadcast, 8888);
+
+            while (isRunning)
+            {
+                string msg = $"{{\"type\":\"discovery\",\"ip\":\"{GetLocalIPAddress()}\",\"port\":{port}}}";
+                byte[] bytes = Encoding.UTF8.GetBytes(msg);
+                udp.Send(bytes, bytes.Length, endPoint);
+                Thread.Sleep(2000); // every 2 seconds
+            }
+        })
+        {
+            IsBackground = true
+        }.Start();
+    }
+
+    private string GetLocalIPAddress()
+    {
+        foreach (var ip in Dns.GetHostEntry(Dns.GetHostName()).AddressList)
+        {
+            if (ip.AddressFamily == AddressFamily.InterNetwork)
+                return ip.ToString();
+        }
+        return "127.0.0.1";
     }
 }
