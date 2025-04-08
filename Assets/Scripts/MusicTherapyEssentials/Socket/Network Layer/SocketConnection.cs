@@ -5,6 +5,10 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
 
+/// <summary>
+/// Handles individual TCP socket connections between the smartwatch and Unity server.
+/// Tracks connection lifetime and supports logging when debugging is enabled.
+/// </summary>
 [Serializable]
 public class SocketConnection
 {
@@ -13,12 +17,18 @@ public class SocketConnection
     private byte[] buffer = new byte[1024];
     private string deviceId;
     private SocketServer server;
+    private DateTime connectionStartTime;
+
+    private bool isClosed = false;
+
+    private string connectionLabel => $"[{deviceId ?? "unknown"} @ {connectionStartTime:HH:mm:ss}]";
 
     public SocketConnection(TcpClient tcpClient, SocketServer server)
     {
         this.client = tcpClient;
         this.server = server;
         this.stream = client.GetStream();
+        this.connectionStartTime = DateTime.UtcNow;
 
         var thread = new System.Threading.Thread(HandleClient)
         {
@@ -30,16 +40,35 @@ public class SocketConnection
     public bool SetDeviceId(string id)
     {
         deviceId = id;
+
+        if (DebugSettings.EnableConnectionLogging)
+        {
+            Debug.Log($"[Connection] Opened [{deviceId} @ {connectionStartTime:HH:mm:ss}]");
+        }
+
         return SessionManager.Register(id, this);
     }
 
     public void Close()
     {
+        if (isClosed)
+        {
+            return; // already closed — no-op
+        }
+        
+        isClosed = true;
+
         try
         {
             stream?.Close();
             client?.Close();
             Debug.Log("[SocketConnection] Closed socket.");
+
+            if (DebugSettings.EnableConnectionLogging)
+            {
+                var duration = DateTime.UtcNow - connectionStartTime;
+                Debug.Log($"[Connection] Closed {connectionLabel} after {duration.TotalSeconds:F1} seconds");
+            }
         }
         catch (Exception e)
         {

@@ -2,12 +2,17 @@ using System.Collections.Generic;
 using UnityEngine;
 using System.Net.Sockets;
 
+/// <summary>
+/// Manages the lifecycle of all connected devices, tracks active devices,
+/// supports reconnection, and conditionally logs reconnect events.
+/// </summary>
 public static class SessionManager
 {
     private static Dictionary<string, SocketConnection> pendingDevices = new();
     private static string activeDeviceId = null;
     private static string lastActiveDeviceId = null;
     private static HashSet<string> previouslyStartedDevices = new();
+    private static Dictionary<string, int> reconnectCounts = new();
 
     public static event System.Action DevicesUpdated;
 
@@ -17,6 +22,8 @@ public static class SessionManager
 
     public static bool Register(string deviceId, SocketConnection connection)
     {
+        TrackReconnect(deviceId);
+
         if (activeDeviceId == null)
         {
             if (pendingDevices.ContainsKey(deviceId))
@@ -65,7 +72,7 @@ public static class SessionManager
             connection.Close();
             pendingDevices.Remove(deviceId);
             MainThreadDispatcher.Instance.Enqueue(() => DevicesUpdated?.Invoke());
-            
+
             return false;
         }
     }
@@ -198,4 +205,22 @@ public static class SessionManager
         }
     }
 
+    private static void TrackReconnect(string deviceId)
+    {
+        bool isFirstConnection = !reconnectCounts.ContainsKey(deviceId);
+
+        if (isFirstConnection)
+        {
+            reconnectCounts[deviceId] = 0;
+            return; // Don't log anything for the first connection
+        }
+
+        reconnectCounts[deviceId]++;
+
+        if (DebugSettings.EnableConnectionLogging)
+        {
+            int count = reconnectCounts[deviceId];
+            Debug.Log($"[Reconnect] {deviceId} has reconnected {count} time{(count == 1 ? "" : "s")}");
+        }
+    }
 }
