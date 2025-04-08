@@ -2239,6 +2239,7 @@ GameObject:
   - component: {fileID: 2015272256}
   - component: {fileID: 2015272257}
   - component: {fileID: 2015272258}
+  - component: {fileID: 2015272259}
   m_Layer: 0
   m_Name: Network Manager
   m_TagString: Untagged
@@ -2286,6 +2287,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   port: 7474
+--- !u!114 &2015272259
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2015272255}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2f1ca3906d137b46b112455312b4201, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableLatencyLogging: 0
 --- !u!1 &2083885559
 GameObject:
   m_ObjectHideFlags: 0

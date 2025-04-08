@@ -67,6 +67,8 @@ public class SocketProtocol
                 {
                     HeartRateData heartRate = JsonConvert.DeserializeObject<HeartRateData>(json);
 
+                    TryLogLatency(type, heartRate.deviceId, heartRate.timestamp );
+
                     // 🧠 Only allow data from the active device
                     if (!SessionManager.IsDeviceActive(heartRate.deviceId))
                     {
@@ -134,6 +136,29 @@ public class SocketProtocol
             default:
                 Debug.LogWarning($"[SocketProtocol] Unknown message type: {json}");
                 break;
+        }
+    }
+
+    private static bool TryLogLatency(MessageType type, string deviceId, string timestamp)
+    {
+        if (!DebugSettings.EnableLatencyLogging || string.IsNullOrEmpty(timestamp))
+        {
+            return false;
+        }
+
+        try
+        {
+            var receivedTime = DateTime.UtcNow;
+            var sentTime = DateTime.ParseExact(timestamp, "yyyy-MM-ddTHH:mm:ss.fffZ", null, System.Globalization.DateTimeStyles.AdjustToUniversal);
+            var latency = (receivedTime - sentTime).TotalMilliseconds;
+
+            Debug.Log($"[Latency] {type} latency from {deviceId}: {latency} ms");
+            return true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"[Latency] Failed to parse timestamp: {e.Message}");
+            return false;
         }
     }
 }
